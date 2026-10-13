@@ -1,0 +1,6 @@
+{
+  "case": "Case 1: Static Qualification",
+  "load_N": 1500.0,
+  "max_deflection_mm": 1.203913589313988,
+  "max_stress_MPa": 143.63066027488674
+}

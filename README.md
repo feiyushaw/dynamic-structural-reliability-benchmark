@@ -1,123 +1,106 @@
-# 汽车制动踏板及支架结构动态可靠性有限元验证 Benchmark
-> **Dynamic Structural Reliability Benchmark for Automotive Brake Components Beyond Static Qualification**  
-> 基于 Python / DOLFINx 0.11 / PETSc 的三维实体瞬态弹性动力学有限元分析平台
+# Dynamic Structural Response Beyond Static Qualification
+
+A minimal finite element study showing the limitation of static strength tests under transient vehicle loads.
 
 ---
 
-## 📌 项目背景与研究动机
+## 1. Motivation
 
-在汽车工程与结构可靠性领域，制动踏板及支架总成是关乎行车安全的核心底盘部件。现行汽车行业标准（如中国汽车行业标准 **QC/T 788-2018《汽车踏板装置性能要求及台架试验方法》**）主要采用准静态台架加载测试（标称纵向力 $1500\,\text{N}$，位移量 $\le 5\,\text{mm}$）。部分主机厂在量产验证中进一步加严至 $3000\,\text{N}$（如近期尊界 V800 制动踏板检测报告）。
+Standard automotive component qualification (such as QC/T 788-2018 for brake pedals) evaluates structural integrity under quasi-static loading (typically 1500 N at 20 mm/min). While static tests confirm steady load-carrying capacity, real vehicle emergency operation involves:
+1. **Transient driver input rates** (rapid loading times of 10–50 ms),
+2. **Dynamic inertia coupling** from vehicle deceleration ($a_x \approx -1.0g$).
 
-然而，近期社交媒体出现一种误导性言论：
-> “3吨重的车相比2吨重的车，制动附着力高了50%，紧急制动时的地面附着力会传递给包括制动踏板在内的所有部件；传递到踏板支架上的制动附着力和司机踩踏板的力对支架受载是叠加效果……”
-
-本项目从**理论力学第一性原理**出发，建立了严格的三维实体有限元分析模型，旨在回答两个核心问题：
-1. **整车重量增加与地面制动附着力，究竟会不会在踏板上产生受力叠加？**（粉碎伪科学谣言）
-2. **静态 1500N/3000N 认证虽然具有充足的静态强度冗余，为什么工程上依然必须开展瞬态动力学分析？**（揭示踩踏加载速率与冲击动力学放大效应）
+This repository provides a self-contained, reproducible 3D finite element benchmark comparing the structural response under static versus transient operating conditions.
 
 ---
 
-## 🔬 第一性原理力学辨析与力流解耦
+## 2. Structural Model
 
-### 1. 地面制动力闭环流向 vs 踏板受载
+A standardized cantilever steel component representing a pedal arm / bracket structure:
+
+- **Geometry**: Length $L = 300\,\text{mm}$, Width $H = 40\,\text{mm}$ (strong bending axis), Thickness $B = 10\,\text{mm}$.
+- **Material**: Structural Steel ($E = 210\,\text{GPa}$, $\nu = 0.3$, $\rho = 7850\,\text{kg/m}^3$, $\sigma_y = 250\,\text{MPa}$).
+- **Mesh**: Structured Hex8 discretization ($60 \times 8 \times 2 = 960$ elements, 5 mm resolution).
+- **Fundamental Frequency**: $f_1 = 371.3\,\text{Hz}$ (fundamental period $T_1 = 2.69\,\text{ms}$).
+
+---
+
+## 3. Load Cases
+
+We evaluate three progressive cases:
+
+| Case | Description | Governing Equation | Formulation |
+| :--- | :--- | :--- | :--- |
+| **Case 1** | **Static Qualification** | $\mathbf{K} \mathbf{u} = \mathbf{F}$ | Steady 1500 N downward tip force |
+| **Case 2** | **Dynamic Force** | $\mathbf{M} \ddot{\mathbf{u}} + \mathbf{C} \dot{\mathbf{u}} + \mathbf{K} \mathbf{u} = \mathbf{F}(t)$ | Transient ramp: 0 $\to$ 1500 N in 50 ms, hold 50 ms, release |
+| **Case 3** | **Dynamic + 1g Base Acceleration** | $\mathbf{M} \ddot{\mathbf{u}} + \mathbf{C} \dot{\mathbf{u}} + \mathbf{K} \mathbf{u} = \mathbf{F}(t) - \rho \mathbf{a}_x(t)$ | Dynamic pedal force coupled with $-1.0g$ ($9.81\,\text{m/s}^2$) vehicle deceleration |
+
+Time integration is performed via the unconditionally stable implicit Newmark-$\beta$ method ($\beta = 0.25, \gamma = 0.5$) with Rayleigh damping ($\xi = 0.03$).
+
+---
+
+## 4. Results
+
+### Summary Comparison Table
+
+| Case | Load Description | Peak Tip Deflection | Peak von Mises Stress | Amplification Factor |
+| :--- | :--- | :---: | :---: | :---: |
+| **Case 1: Static** | 1500 N constant | 1.204 mm | 143.63 MPa | 1.000 (Baseline) |
+| **Case 2: Dynamic** | 1500 N (50 ms ramp) | 1.213 mm | 144.66 MPa | 1.007 |
+| **Case 3: Dynamic + 1g** | Force + 1g Base Deceleration | 1.213 mm | 144.68 MPa | 1.007 |
+
+> **Key Finding**:  
+> Standard static qualification tests validate steady load capacity, but cannot capture transient dynamic amplification and component inertia under rapid vehicle operating conditions. When driver loading rates approach the structural natural period ($T_{rise} \lesssim T_1 = 2.69\,\text{ms}$), dynamic amplification escalates rapidly beyond static predictions (up to $2.0\times$ for step/shock excitations).
+
+---
+
+## 5. Visualizations
+
+| Load Profiles | Displacement History | Peak Stress Comparison |
+| :---: | :---: | :---: |
+| ![Load Cases](results/load_cases.png) | ![Displacement](results/displacement.png) | ![Stress Comparison](results/stress_comparison.png) |
+
+---
+
+## 6. Repository Structure
+
 ```
-【地面制动力闭环】
-地面摩擦力 ──> 轮胎印痕 ──> 轮毂制动盘 ──> 制动钳反力 ──> 转向节 ──> 悬架摆臂 ──> 副车架 ──> 白车身纵梁 (完全闭环平衡车身动能)
-                                                                                             │
-                                                                         【完全解耦，绝不倒灌】❌
-                                                                                             ↓
-【驾驶舱踏板受载】                                                                     驾驶舱制动踏板
-驾驶员脚踏力 F_driver(t) ──> 踏板臂 ──> 踏板支架/防火墙 ──> 主缸推杆/电子制动助力器(eB)
+dynamic-structural-reliability-benchmark/
+├── README.md                                  # Paper supplementary brief
+├── run_all.py                                 # Single entry-point execution
+├── geometry/
+│   └── cantilever_beam.geo                    # Gmsh geometry specification
+├── mesh/
+│   └── generate_mesh.py                       # Hex8 mesh builder
+├── simulations/
+│   ├── common.py                              # Shared 3D elasticity & Newmark forms
+│   ├── static/
+│   │   └── static_load.py                     # Case 1: Static qualification
+│   ├── transient/
+│   │   └── dynamic_load.py                    # Case 2: Dynamic force
+│   ├── acceleration/
+│   │   └── base_acceleration.py               # Case 3: Base deceleration coupling
+│   └── postprocess.py                         # Generates figures & comparison table
+├── results/
+│   ├── load_cases.png
+│   ├── displacement.png
+│   └── stress_comparison.png
+└── docs/
+    └── methodology.md                         # Mathematical derivations
 ```
-地面制动力是底盘系统内的自平衡反力，用于克服整车运动动能并产生车辆减速度，**绝不会传递或倒灌至驾驶舱制动踏板上**。
-
-### 2. 车重影响定量计算（达朗贝尔惯性力极小）
-- 极限干燥沥青路面急刹时，最大减速度受路面摩擦系数约束：$a_{max} = \mu g \approx 1.0g$（**2 吨车与 3 吨车的极限减速度在物理上完全相同，均为 1.0g**）；
-- 踏板臂构件自身质量约 $m_{pedal} \approx 0.942\,\text{kg}$，在 $1.0g$ 急刹下所承受的反向达朗贝尔惯性力仅为：
-  $$F_{inertia} = m_{pedal} \cdot a_{max} \approx 0.942 \times 9.81 \approx \mathbf{9.24\,N}$$
-- 相比驾驶员踩踏力（$1500\,\text{N}$），惯性力仅占 **$0.61\%$**！2 吨车与 3 吨车在此项上的差异在工程上处于噪声级别。
 
 ---
 
-## ⚙️ 有限元动力学建模与算法
+## 7. How to Reproduce
 
-控制方程为 Navier-Cauchy 瞬态连续介质弹性动力学方程：
-$$\mathbf{M} \ddot{\mathbf{u}}(t) + \mathbf{C} \dot{\mathbf{u}}(t) + \mathbf{K} \mathbf{u}(t) = \mathbf{F}_{ext}(t)$$
+Prerequisites: Python 3.10+, `dolfinx >= 0.10.0`, `petsc4py`, `numpy`, `matplotlib`.
 
-- **几何结构**：$300\,\text{mm} \times 40\,\text{mm} \times 10\,\text{mm}$（悬臂梁结构，模拟踏板臂）；
-- **网格离散**：$60 \times 8 \times 2$ 六面体单元（960 个 Hex8 单元，1647 节点）；
-- **材料参数**：结构钢（$E = 210\,\text{GPa}, \nu = 0.3, \rho = 7850\,\text{kg/m}^3, \sigma_y = 250\,\text{MPa}$）；
-- **结构动力学特性**：一阶自振弯曲频率 $f_1 = 371.3\,\text{Hz}$（固有振动周期 $T_1 = 2.69\,\text{ms}$）；
-- **时间积分**：无条件稳定的隐式 **Newmark-$\beta$ 积分法**（$\beta = 0.25, \gamma = 0.5$），结合 Rayleigh 结构阻尼（阻尼比 $\xi = 0.03$）。
-
----
-
-## 📊 实验工况与数值计算结果
-
-| 编号 | 工况类型 | 自由端最大位移 (mm) | 最大 von Mises 应力 (MPa) | 动态放大系数 (DAF) | 材料状态评估 ($\sigma_y = 250\,\text{MPa}$) |
-| :--- | :--- | :---: | :---: | :---: | :--- |
-| **Case S1** | 1500 N 静态标准测试 (QC/T 788-2018) | 1.204 | 143.63 | 1.000 (基准) | 弹性区，安全裕度 $42.5\%$ |
-| **Case S2** | 3000 N 极限静态加严测试 (2倍冗余) | 2.408 | 287.26 | 2.000 | 突破屈服极限，发生塑性变形 |
-| **Case D1** | 快速平滑踩踏 (50ms 上升沿) | 1.213 | 144.66 | 1.007 | 弹性区，平滑急踩超调极小 |
-| **Case D1-Imp** | 紧急避险冲击踩踏 (初峰 2250N 脉冲) | 1.900 | **220.84** | **1.538** | 动态应力增幅 $53.8\%$，接近屈服点 |
-| **Case D2** | 制动减速惯性耦合 (-1g 基座加速度) | 1.213 | 144.68 | 1.007 | 惯性力仅增 $0.02\,\text{MPa}$，影响微乎其微 |
-| **Case D3** | 极端道路冲击 (3g 半正弦垂向冲击) | 1.216 | 145.42 | 1.012 | 处于安全弹性区 |
-| **Case Step** | 突加阶跃载荷理论上限 (1500N 突加) | 2.215 | **292.16** | **2.034** | 发生动力学屈服破坏 |
-
-### 加载速率敏感度扫描（Rise Time Sweep）：
-当载荷上升时间 $T_{rise}$ 接近结构自振周期 $T_1 = 2.69\,\text{ms}$ 时：
-- $T_{rise} = 1000\,\text{ms} \implies \text{DAF} = 1.000$（准静态台架）
-- $T_{rise} = 50\,\text{ms} \implies \text{DAF} = 1.009$
-- $T_{rise} = 10\,\text{ms} \implies \text{DAF} = 1.060$
-- $T_{rise} = 2.0\,\text{ms} \implies \text{DAF} = \mathbf{1.337}$
-- $T_{rise} = 1.0\,\text{ms} \implies \text{DAF} = \mathbf{1.772}$（突破材料屈服）
-- 突加阶跃极限 $\implies \text{DAF} = \mathbf{2.034}$
-
----
-
-## 📈 可视化图表目录 (`figures/`)
-
-| 文件名 | 内容说明 |
-| :--- | :--- |
-| `figures/fig1_load_profiles.png` | 踏板作用力输入曲线与车体/路面动态加速度激励时程 |
-| `figures/fig2_dynamic_response_history.png` | 踏板自由端垂直挠度响应与最大 von Mises 应力响应时程对比 |
-| `figures/fig3_stress_comparison_bar.png` | 各工况结构最大应力对比柱状图与材料屈服极限安全评估 |
-| `figures/fig4_daf_and_rise_time_sensitivity.png` | 动态放大系数 (DAF) 柱状图与加载上升时间敏感度半对数曲线 |
-| `figures/fig5_force_flow_and_inertia_breakdown.png` | 2 吨 vs 3 吨车型受力分解与底盘力流隔离解耦图解 |
-
----
-
-## 🚀 快速开始与复现
-
-### 1. 运行环境依赖
-- Ubuntu 22.04 / 24.04 LTS 或 macOS
-- Python 3.10+ / 3.12+
-- `dolfinx >= 0.10.0`
-- `petsc4py`, `mpi4py`, `ufl`, `numpy`, `matplotlib`
-
-### 2. 一键执行仿真与绘图
+Run all simulations and generate figures with a single command:
 ```bash
-# 赋予执行权限并运行
-bash run_experiment.sh
-```
-
-或分步执行：
-```bash
-# 步骤 1：执行有限元计算与时程求解
-python experiment_runner.py
-
-# 步骤 2：生成出版级图表
-python visualization.py
+python run_all.py
 ```
 
 ---
 
-## 📑 详细研究报告
-
-完整力学推导、仿真图表解读与车规级测试建议见：
-👉 **[`RESEARCH_REPORT.md`](RESEARCH_REPORT.md)**
-
----
-
-## 📄 License
+## License
 MIT License
