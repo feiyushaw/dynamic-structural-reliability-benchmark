@@ -1,10 +1,10 @@
 """
-Spatial Stress Distribution & Failure Risk Contour Visualization.
+Spatial Stress Distribution & Failure Risk Contour Visualization (Intuitive Edition).
 Computes and visualizes the 2D longitudinal mid-plane and 3D stress fields for:
-  - Case 1: Quasi-static qualification (1500 N)
-  - Case 3: High-rate emergency impact stamping (peak response)
+  - Case 1: Quasi-static qualification (1500 N slow test)
+  - Case 3: High-rate emergency impact stamping (peak response from sudden stomp)
 Generates:
-  1. results/stress_distribution_contour.png (Multi-panel contour plot)
+  1. results/stress_distribution_contour.png (Multi-panel plain Chinese contour plot)
   2. results/beam_case1_static.pvd & results/beam_case3_impact.pvd (ParaView 3D VTK export)
 """
 
@@ -63,9 +63,7 @@ def run_stress_distribution_analysis(out_dir: str = "results"):
     print("Computing 3D Spatial Stress Distribution & Failure Risk Fields...")
     model = BeamModel()
 
-    # -------------------------------------------------------------
     # 1. Solve Case 1 (Quasi-Static 1500 N)
-    # -------------------------------------------------------------
     rhs_s1 = model.K.createVecRight()
     rhs_s1.zeroEntries()
     rhs_s1.axpy(1500.0, model.vec_tip_y)
@@ -83,15 +81,12 @@ def run_stress_distribution_analysis(out_dir: str = "results"):
 
     x_mm, y_mm, grid_s1, f_vm_s1 = extract_stress_grid(model, uh_s1)
 
-    # -------------------------------------------------------------
     # 2. Solve Case 3 (High-Rate Impact Peak at t = 10 ms)
-    # -------------------------------------------------------------
     dt = 0.0002
     t_span = np.arange(0.0, 0.025 + dt, dt)
     n_steps = len(t_span)
     g = 9.80665
 
-    # Newmark parameters
     beta, gamma = 0.25, 0.5
     a0 = 1.0 / (beta * dt * dt)
     a1 = gamma / (beta * dt)
@@ -125,7 +120,6 @@ def run_stress_distribution_analysis(out_dir: str = "results"):
 
     for step in range(n_steps):
         t = t_span[step]
-        # Force pulse
         if t < 0.010:
             F_val = 2250.0 * (t / 0.010)
         else:
@@ -152,7 +146,6 @@ def run_stress_distribution_analysis(out_dir: str = "results"):
         v_next.zeroEntries(); v_next.axpy(1.0, v_curr); v_next.axpy(a6, a_curr); v_next.axpy(a7, a_next)
         u_next.copy(u_curr); v_next.copy(v_curr); a_next.copy(a_curr)
 
-        # Check peak stress at t ~ 10ms
         if np.isclose(t, 0.010, atol=dt/2.0) or t >= 0.010:
             uh_test = fem.Function(model.V)
             u_curr.copy(uh_test.x.petsc_vec)
@@ -165,9 +158,7 @@ def run_stress_distribution_analysis(out_dir: str = "results"):
 
     _, _, grid_c3, f_vm_c3 = extract_stress_grid(model, uh_peak_dyn)
 
-    # -------------------------------------------------------------
-    # 3. Export 3D VTK Files for ParaView
-    # -------------------------------------------------------------
+    # Export VTK Files
     vtk_c1_path = os.path.join(out_dir, "beam_case1_static.pvd")
     with io.VTKFile(model.comm, vtk_c1_path, "w") as vtk:
         vtk.write_function([uh_s1, f_vm_s1])
@@ -178,52 +169,48 @@ def run_stress_distribution_analysis(out_dir: str = "results"):
         vtk.write_function([uh_peak_dyn, f_vm_c3])
     print(f"Exported ParaView 3D file: {vtk_c3_path}")
 
-    # -------------------------------------------------------------
-    # 4. Compute Failure Risk Index Fields
-    #   eta_static  = sigma_vM / 400.0 (Ductile UTS capacity)
-    #   eta_dynamic = sigma_vM / 245.0 (Dynamic cleavage fracture threshold)
-    # -------------------------------------------------------------
-    risk_s1 = grid_s1 / 400.0
-    risk_c3 = grid_c3 / 245.0
+    # Compute Failure Risk Index Fields
+    risk_s1 = grid_s1 / 400.0  # static capacity: 400 MPa
+    risk_c3 = grid_c3 / 245.0  # dynamic cleavage capacity: 245 MPa
 
-    # -------------------------------------------------------------
-    # 5. Render Multi-Panel Publication Contour Plot
-    # -------------------------------------------------------------
+    # Render Multi-Panel Publication Contour Plot
     X_mesh, Y_mesh = np.meshgrid(x_mm, y_mm)
-    fig, axes = plt.subplots(4, 1, figsize=(14, 11), sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(14.5, 11.2), sharex=True)
 
     # (a) Case 1 Stress Contour
     c1_map = axes[0].pcolormesh(X_mesh, Y_mesh, grid_s1, cmap="turbo", shading="gouraud", vmin=0, vmax=230)
     cb1 = fig.colorbar(c1_map, ax=axes[0], pad=0.015, aspect=12)
     cb1.set_label("应力 (MPa)", fontsize=10)
-    axes[0].set_title("(a) Case 1 准静态测试：悬臂梁纵向截面 von Mises 应力分布 (峰值 143.6 MPa)", fontweight="bold", pad=8)
-    axes[0].axhline(20.0, color="white", linestyle=":", lw=1.2, alpha=0.7, label="中性轴 (正应力=0)")
+    axes[0].set_title("(a) Case 1 准静态测试（慢踩）：应力平缓，全梁处于安全范围 (根部最大受力 143.6 MPa)", fontweight="bold", pad=8)
+    axes[0].axhline(20.0, color="white", linestyle=":", lw=1.2, alpha=0.7)
     axes[0].annotate("固定端 (X=0)\n踏板支架安装板", xy=(0, 20), xytext=(-25, 20), ha="right", va="center", fontsize=8.5, fontweight="bold")
-    axes[0].annotate("外载 F=1500N\n(踏板踩踏端)", xy=(300, 20), xytext=(305, 20), ha="left", va="center", fontsize=8.5, fontweight="bold", color="blue")
-    axes[0].annotate("根部最大拉应力 (143.6 MPa)", xy=(2.5, 37.5), xytext=(25, 36), arrowprops=dict(facecolor="black", shrink=0.08, width=0.8, headwidth=4), fontsize=8.5)
+    axes[0].annotate("踩踏受力端 (X=300)\n外力 F=1500 N", xy=(300, 20), xytext=(305, 20), ha="left", va="center", fontsize=8.5, fontweight="bold", color="blue")
+    axes[0].annotate("根部最大受力点 (143.6 MPa)", xy=(2.5, 37.5), xytext=(25, 36), arrowprops=dict(facecolor="black", shrink=0.08, width=0.8, headwidth=4), fontsize=8.5)
 
     # (b) Case 3 Stress Contour
     c3_map = axes[1].pcolormesh(X_mesh, Y_mesh, grid_c3, cmap="turbo", shading="gouraud", vmin=0, vmax=230)
     cb2 = fig.colorbar(c3_map, ax=axes[1], pad=0.015, aspect=12)
     cb2.set_label("应力 (MPa)", fontsize=10)
-    axes[1].set_title("(b) Case 3 动态冲击跺脚 (峰值时刻)：von Mises 应力空间激增分布 (峰值 220.8 MPa)", fontweight="bold", pad=8)
+    axes[1].set_title("(b) Case 3 动态冲击踩踏（猛踩）：根部受力瞬间暴涨 54% (达到 220.8 MPa，危险区大面积向前扩展)", fontweight="bold", pad=8)
     axes[1].axhline(20.0, color="white", linestyle=":", lw=1.2, alpha=0.7)
-    axes[1].annotate("冲击应力激增区 (220.8 MPa)\n高应力区显著向前扩展", xy=(2.5, 37.5), xytext=(35, 34), arrowprops=dict(facecolor="black", shrink=0.08, width=0.8, headwidth=4), fontsize=8.5, fontweight="bold", color="darkred")
+    axes[1].annotate("冲击受力暴涨区 (220.8 MPa)\n受力向前方大面积蔓延！", xy=(2.5, 37.5), xytext=(35, 34), arrowprops=dict(facecolor="black", shrink=0.08, width=0.8, headwidth=4), fontsize=8.5, fontweight="bold", color="darkred")
 
     # (c) Case 1 Failure Risk Index
     r1_map = axes[2].pcolormesh(X_mesh, Y_mesh, risk_s1, cmap="YlOrRd", shading="gouraud", vmin=0, vmax=1.0)
     cb3 = fig.colorbar(r1_map, ax=axes[2], pad=0.015, aspect=12)
-    cb3.set_label("破坏风险度 $\\eta$", fontsize=10)
-    axes[2].set_title("(c) Case 1 静态破坏风险指数场 $\\eta = \\sigma_{vM} / \\sigma_{fail}^{stat}$ (基准极限 400 MPa, 峰值风险仅 0.36, 极度安全)", fontweight="bold", pad=8)
-    axes[2].annotate("静态充分延性吸能\n最大破坏风险仅 36%\n(绿色低危安全区)", xy=(150, 20), ha="center", va="center", fontsize=9.5, fontweight="bold", color="#196f3d", bbox=dict(boxstyle="round,pad=0.3", fc="#d5f5e3", ec="#27ae60", alpha=0.9))
+    cb3.set_label("破坏危险度 (越接近1越危险)", fontsize=10)
+    axes[2].set_title("(c) Case 1 静态破坏危险度：最大危险度仅 36%（全梁深绿，材料大延性吸能，充分安全！）", fontweight="bold", pad=8)
+    axes[2].annotate("静态慢踩：大延性充分缓冲吸能\n最大破坏危险度仅 36%\n【绿灯极度安全】", xy=(150, 20), ha="center", va="center", fontsize=9.5, fontweight="bold", color="#196f3d", bbox=dict(boxstyle="round,pad=0.3", fc="#d5f5e3", ec="#27ae60", alpha=0.9))
 
     # (d) Case 3 Failure Risk Index
     r2_map = axes[3].pcolormesh(X_mesh, Y_mesh, risk_c3, cmap="YlOrRd", shading="gouraud", vmin=0, vmax=1.0)
     cb4 = fig.colorbar(r2_map, ax=axes[3], pad=0.015, aspect=12)
-    cb4.set_label("破坏风险度 $\\eta$", fontsize=10)
-    axes[3].set_title("(d) Case 3 动态冲击破坏风险指数场 $\\eta = \\sigma_{vM} / \\sigma_{fail}^{dyn}$ (脆断极限 245 MPa, 峰值风险高达 0.90, 高危濒断!)", fontweight="bold", pad=8)
+    cb4.set_label("破坏危险度 (越接近1越危险)", fontsize=10)
+    axes[3].set_title("(d) Case 3 动态冲击破坏危险度：最大危险度飙升至 90%（根部一片深红高危警报，濒临脆裂断开！）", fontweight="bold", pad=8)
     axes[3].axhline(20.0, color="black", linestyle=":", lw=1.2, alpha=0.5)
-    axes[3].annotate("根部脆断极度危险区 (风险指数 $\\eta = 0.90$)\n缺乏塑性钝化，极易诱发微裂纹失稳撕裂！", xy=(2.5, 37.5), xytext=(45, 30), arrowprops=dict(facecolor="crimson", shrink=0.08, width=1.0, headwidth=5), fontsize=9, fontweight="bold", color="crimson", bbox=dict(boxstyle="round,pad=0.3", fc="#fce4e4", ec="crimson", alpha=0.95))
+    axes[3].annotate("⚠️ 根部极度危险区！(破坏危险度高达 90%)\n材料变脆丧失缓冲，极易在此处瞬间脆裂断开！\n【红灯濒临踩断高危】", xy=(2.5, 37.5), xytext=(45, 30),
+                     arrowprops=dict(facecolor="crimson", shrink=0.08, width=1.0, headwidth=5), fontsize=9, fontweight="bold", color="crimson",
+                     bbox=dict(boxstyle="round,pad=0.3", fc="#fce4e4", ec="crimson", alpha=0.95))
 
     for ax in axes:
         ax.set_ylabel("截面高度 Y (mm)", fontsize=10)
