@@ -1,7 +1,7 @@
 """
-Case 2: Transient Dynamic Force Loading
-Simulates rapid driver pedal application (0 -> 1500 N in 50 ms, hold 50 ms, release).
-Solves: M * u'' + C * u' + K * u = F(t) using Newmark-beta method.
+Case 2: Transient Dynamic Force Loading (50 ms Ramp)
+Simulates rapid driver pedal application (0 -> 1500 N in 50 ms).
+Evaluates transient strain rate evolution and moderate rate-hardening effect.
 """
 
 import sys
@@ -13,15 +13,18 @@ import numpy as np
 from dolfinx import fem
 from dolfinx.fem import petsc
 from petsc4py import PETSc
-from simulations.common import BeamModel
+from simulations.common import (
+    BeamModel,
+    cowper_symonds_yield,
+    dynamic_ductility_ratio,
+)
 
 
 def run_dynamic_case(output_file: str = "results/case2_dynamic.json"):
-    print("=" * 60)
+    print("=" * 65)
     print("[Case 2] Transient Dynamic Loading (50 ms Ramp)")
     model = BeamModel()
 
-    # Time discretization
     dt = 0.0002
     t_span = np.arange(0.0, 0.20 + dt, dt)
     n_steps = len(t_span)
@@ -36,7 +39,7 @@ def run_dynamic_case(output_file: str = "results/case2_dynamic.json"):
         else:
             F_t[i] = 1500.0 * max(0.0, 1.0 - (t - 0.10) / 0.10)
 
-    # Newmark parameters (beta=0.25, gamma=0.5)
+    # Newmark setup
     beta, gamma = 0.25, 0.5
     a0 = 1.0 / (beta * dt * dt)
     a1 = gamma / (beta * dt)
@@ -47,7 +50,6 @@ def run_dynamic_case(output_file: str = "results/case2_dynamic.json"):
     a6 = dt * (1.0 - gamma)
     a7 = gamma * dt
 
-    # Dynamic effective stiffness: K_hat = K + a0*M + a1*C
     K_hat = model.K.copy()
     K_hat.axpy(a0, model.M)
     K_hat.axpy(a1, model.C)
@@ -74,7 +76,9 @@ def run_dynamic_case(output_file: str = "results/case2_dynamic.json"):
     u_curr.set(0.0); v_curr.set(0.0); a_curr.set(0.0)
 
     history_t, history_disp, history_stress = [], [], []
+    history_edot, history_sig_y, history_duct = [], [], []
     uh = fem.Function(model.V)
+    vh = fem.Function(model.V)
 
     for step in range(n_steps):
         t = t_span[step]
@@ -112,14 +116,35 @@ def run_dynamic_case(output_file: str = "results/case2_dynamic.json"):
             uh.x.scatter_forward()
             vm = model.compute_von_mises(uh) / 1e6
             history_stress.append(vm)
+
+            # Evaluate strain rate from velocity field
+            v_curr.copy(vh.x.petsc_vec)
+            vh.x.scatter_forward()
+            edot = model.compute_strain_rate(vh)
+            sig_y = cowper_symonds_yield(edot) / 1e6
+            duct = dynamic_ductility_ratio(edot)
+
+            history_edot.append(edot)
+            history_sig_y.append(sig_y)
+            history_duct.append(duct)
         else:
             history_stress.append(history_stress[-1])
+            history_edot.append(history_edot[-1])
+            history_sig_y.append(history_sig_y[-1])
+            history_duct.append(history_duct[-1])
 
     peak_disp = float(np.max(history_disp))
     peak_stress = float(np.max(history_stress))
-    print(f"  Peak Tip Deflection : {peak_disp:.3f} mm")
-    print(f"  Peak von Mises Stress: {peak_stress:.2f} MPa")
-    print("=" * 60)
+    peak_edot = float(np.max(history_edot))
+    peak_sig_y = float(np.max(history_sig_y))
+    min_duct = float(np.min(history_duct)) * 100.0
+
+    print(f"  Peak Tip Deflection     : {peak_disp:.3f} mm")
+    print(f"  Peak von Mises Stress   : {peak_stress:.2f} MPa")
+    print(f"  Peak Transient Strain Rate: {peak_edot:.2e} s^-1")
+    print(f"  Dynamic Yield Strength  : {peak_sig_y:.2f} MPa (Rate Hardening: +{(peak_sig_y/250-1)*100:.1f}%)")
+    print(f"  Min Ductility Retention : {min_duct:.1f}%")
+    print("=" * 65)
 
     result = {
         "case": "Case 2: Dynamic Force (50ms Ramp)",
@@ -127,8 +152,14 @@ def run_dynamic_case(output_file: str = "results/case2_dynamic.json"):
         "force_N": F_t.tolist(),
         "deflection_mm": history_disp,
         "stress_MPa": history_stress,
+        "strain_rate_s1": history_edot,
+        "dynamic_yield_MPa": history_sig_y,
+        "ductility_ratio": history_duct,
         "peak_deflection_mm": peak_disp,
         "peak_stress_MPa": peak_stress,
+        "peak_strain_rate_s1": peak_edot,
+        "peak_dynamic_yield_MPa": peak_sig_y,
+        "min_ductility_pct": min_duct,
     }
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True)

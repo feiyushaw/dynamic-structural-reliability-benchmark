@@ -1,6 +1,9 @@
 {
-  "case": "Case 1: Static Qualification",
+  "case": "Case 1: Static Qualification (QC/T 788 Benchmark)",
   "load_N": 1500.0,
   "max_deflection_mm": 1.203913589313988,
-  "max_stress_MPa": 143.63066027488674
+  "max_stress_MPa": 143.63066027488674,
+  "strain_rate_s1": 0.0001,
+  "dynamic_yield_MPa": 250.0,
+  "ductility_ratio": 1.0
 }

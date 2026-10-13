@@ -1,6 +1,12 @@
 """
-Common Finite Element definitions and utilities for Cantilever Steel Beam.
-Implements 3D elasticity forms, system matrices assembly, and von Mises stress evaluation.
+Common Finite Element definitions and rate-dependent constitutive utilities
+for Cantilever Steel Beam under dynamic impact loading.
+Implements:
+  - 3D elastodynamics forms and system matrices (Newmark-beta)
+  - Strain rate tensor and equivalent strain rate calculation
+  - Cowper-Symonds rate-dependent dynamic yield strength:
+      sigma_y(edot) = sigma_0 * [1 + ((edot - edot_0) / D)^(1/p)] (for edot > edot_0)
+  - Dynamic ductility reduction / embrittlement evaluation
 """
 
 import sys
@@ -17,8 +23,42 @@ from petsc4py import PETSc
 from mesh.generate_mesh import create_cantilever_mesh
 
 
+# Cowper-Symonds material constants for structural steel
+COWPER_SYMONDS_SIGMA0 = 250e6  # 250 MPa quasi-static yield stress
+COWPER_SYMONDS_D = 40.4        # D parameter: 40.4 s^-1
+COWPER_SYMONDS_P = 5.0         # p parameter: 5.0
+STATIC_STRAIN_RATE = 1.0e-4    # Quasi-static reference rate: 10^-4 s^-1
+
+
+def cowper_symonds_yield(
+    edot: float,
+    sigma0: float = COWPER_SYMONDS_SIGMA0,
+    D: float = COWPER_SYMONDS_D,
+    p: float = COWPER_SYMONDS_P,
+    edot_0: float = STATIC_STRAIN_RATE,
+) -> float:
+    """
+    Compute dynamic yield stress (Pa) via Cowper-Symonds rate-dependent constitutive law.
+    Normalized such that at quasi-static rate edot <= edot_0, sigma_y = sigma0 exactly.
+    """
+    edot_val = float(edot)
+    if edot_val <= edot_0:
+        return sigma0
+    return sigma0 * (1.0 + ((edot_val - edot_0) / D) ** (1.0 / p))
+
+
+def dynamic_ductility_ratio(edot: float, C_eps: float = 0.08, edot_0: float = STATIC_STRAIN_RATE) -> float:
+    """
+    Compute relative dynamic failure ductility ratio eps_f(edot) / eps_f0.
+    Reflects dynamic embrittlement under high strain rates.
+    """
+    edot_val = max(float(edot), edot_0)
+    rate_factor = 1.0 + C_eps * np.log(edot_val / edot_0)
+    return 1.0 / rate_factor
+
+
 class BeamModel:
-    """Minimal Cantilever Steel Beam FEA Model."""
+    """Cantilever Steel Beam FEA Model with Rate-Dependent Constitutive Evaluation."""
 
     def __init__(self, L=0.3, H=0.04, B=0.01, E=210e9, nu=0.3, rho=7850.0, damping_ratio=0.03):
         self.L, self.H, self.B = L, H, B
@@ -53,6 +93,7 @@ class BeamModel:
         lmbda = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu))
         eps = lambda w: ufl.sym(ufl.grad(w))
         sig = lambda w: 2.0 * mu * eps(w) + lmbda * ufl.tr(eps(w)) * ufl.Identity(3)
+        self.epsilon = eps
         self.sigma = sig
 
         self.k_form = fem.form(ufl.inner(sig(u), eps(v)) * self.dx)
@@ -95,3 +136,16 @@ class BeamModel:
         f_vm = fem.Function(self.W)
         f_vm.interpolate(expr)
         return float(np.max(f_vm.x.array))
+
+    def compute_strain_rate(self, v_func: fem.Function) -> float:
+        """
+        Compute maximum equivalent strain rate (s^-1) from velocity field v_func:
+        edot_eq = sqrt(2/3 * eps_dot : eps_dot)
+        """
+        eps_dot = self.epsilon(v_func)
+        edot_dev = eps_dot - (1.0 / 3.0) * ufl.tr(eps_dot) * ufl.Identity(3)
+        edot_eq = ufl.sqrt(ufl.inner(edot_dev, edot_dev) * (2.0 / 3.0) + 1e-16)
+        expr = fem.Expression(edot_eq, self.W.element.interpolation_points)
+        f_edot = fem.Function(self.W)
+        f_edot.interpolate(expr)
+        return float(np.max(f_edot.x.array))
