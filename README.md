@@ -1,6 +1,6 @@
-# 汽车制动踏板及支架结构动态可靠性有限元验证 Benchmark
-> **Dynamic Structural Reliability Benchmark for Automotive Brake Components: Why Dynamic Impact ≠ Static Qualification**  
-> 基于 Python / DOLFINx 0.11 / PETSc 的三维实体瞬态弹性动力学有限元分析平台
+# Dynamic Structural Reliability Benchmark for Automotive Brake Components
+
+A minimal 3D finite element benchmark demonstrating why dynamic loading impact rates fundamentally alter material constitutive behavior (Cowper-Symonds strain-rate hardening & dynamic embrittlement), exposing why quasi-static strength qualification fails to ensure dynamic reliability.
 
 ---
 
@@ -19,7 +19,7 @@
 
 | 力学维度 | Case 1：准静态台架测试 (QC/T 788) | Case 2 & 3：动态紧急避险急刹 / 碰撞跺脚 | 物理本质与深层机理差异 |
 | :--- | :--- | :--- | :--- |
-| **1. 输入激励特性** | 标量恒定慢速载荷 ($20\,\text{mm/min}$，加载时长达数秒) | 强瞬态冲量脉冲 ($10 \sim 50\,\text{ms}$ 冲量尖峰，伴随脚掌初速度撞击) | 静态加速度 $M\ddot{\mathbf{u}} \approx \mathbf{0}$；动态为时域波动激励 |
+| **1. 输入激励特性** | 标量恒定慢速载荷 ($20\,\text{mm/min}$，加载数秒) | 强瞬态冲量脉冲 ($10 \sim 50\,\text{ms}$ 冲量尖峰，伴随脚掌初速度撞击) | 静态加速度 $M\ddot{\mathbf{u}} \approx \mathbf{0}$；动态为时域强瞬态波动激励 |
 | **2. 结构动力学响应** | 静力平衡方程 $\mathbf{K}\mathbf{u} = \mathbf{F}$，各物理量与时间无关 | 瞬态弹性动力学方程 $\mathbf{M}\ddot{\mathbf{u}} + \mathbf{C}\dot{\mathbf{u}} + \mathbf{K}\mathbf{u} = \mathbf{F}(t)$ | 动态工况激发高频自振驻波，产生动力超调放大 (DAF) |
 | **3. 介观材料本构** | **低应变率区** ($\dot{\varepsilon} \sim 10^{-4}\,\text{s}^{-1}$)，位错滑移热激活充分 | **高应变率冲击区** ($\dot{\varepsilon} \sim 1.6 \times 10^{-1}\,\text{s}^{-1}$，跨越 3~4 个数量级！) | 触发 Cowper-Symonds 率硬化，流变应力大幅跃升 ($+33\%$) |
 | **4. 破坏失效机理** | **大延性塑性吸能破坏** (延伸率 $25\% \sim 30\%$)，承载上限达抗拉极限 ($400\,\text{MPa}$) | **高应变率解理脆性断裂 (Brittle Cleavage)**，临界脆断强度断崖式跌落至 $\approx 245\,\text{MPa}$ | **发生材料“韧-脆转变”**；位错被声子阻尼锁定，丧失塑性钝化能力 |
@@ -90,25 +90,18 @@ Case 3: Impact       |   1.6e-01 s^-1 |  220.84 MPa |    245.00 MPa |        1.1
 在 Case 3 中，由于冲量脉冲与动力驻波叠加，实际工作应力飙升至 **$220.84\,\text{MPa}$**；  
 实际工作应力（220.84 MPa）直接逼近脆断极限（245.00 MPa），**有效破坏安全系数从静态的 2.78x 暴跌至仅剩 1.11x**！若构件存在微小冲压折弯微裂纹，极易在急刹冲击下瞬间越过格里菲斯临界尺寸而失稳脆断。
 
-#### 4. 第一性原理粉碎舆论力学误区：车重增加不会加剧踏板受载
-Case 3 仿真中严格计入了整车在紧急制动下的基座加速度（$a_x = -1.0g$）：
-- 地面制动摩擦力作用于轮胎接地印痕面，经轮端卡钳、悬架摆臂、副车架传递至白车身，在底盘系统内**完全闭环平衡整车动能，绝不倒灌至踏板**；
-- 乘用车制动减速度受限于轮胎路面附着系数（$a_{max} = \mu g \approx 1.0g$），**2 吨车与 3 吨车的极限急刹减速度在理论上完全相同，均为 1.0g**；
-- 踏板构件自身质量仅 $0.942\,\text{kg}$，车身减速产生的反向达朗贝尔惯性力仅为 $9.24\,\text{N}$（仅占脚踏力的 **$0.61\%$**，应力增量仅 $0.02\,\text{MPa}$）。**2 吨车与 3 吨车在踏板惯性受载上物理差异为 0 N**。
-
 ---
 
-## 📈 实验可视化图表成果 (`results/`)
+## 📈 空间应力分布云图与可视化成果 (`results/`)
 
-所有图表均由 `simulations/postprocess.py` 自动化渲染生成：
+### 1. 悬臂梁空间应力场与破坏风险度空间分布云图
+![Spatial Stress & Failure Risk Contour](results/stress_distribution_contour.png)
+*图：(a) Case 1 准静态应力云图；(b) Case 3 动态冲击应力空间激增云图；(c) Case 1 静态破坏风险指数场 ($\eta \le 0.36$)；(d) Case 3 动态冲击破坏风险指数场 ($\eta$ 逼近 0.90，根部拉应力区呈现大面积深红高危警报！)*
 
+### 2. 本构演变与综合柱状对比图表
 | 图 1：材料率相关流变本构与动态脆化曲线 | 图 2：瞬态应变率时程与动态屈服极限演化 | 图 3：工作应力 vs 破坏极限与安全系数断崖 |
 | :---: | :---: | :---: |
 | ![Constitutive](results/strain_rate_constitutive.png) | ![Evolution](results/transient_rate_evolution.png) | ![Stress Comparison](results/stress_comparison.png) |
-
-- **图 1**：展示 Cowper-Symonds 动态流变应力随应变率的抬升规律，以及伴随的高应变率动态延性脆化（断裂韧性骤降）折减曲线；
-- **图 2**：展示急踩（Case 2）与冲击剁脚（Case 3）在时域内激发的等效应变率 $\dot{\varepsilon}_{eq}(t)$ 尖峰，及其驱动材料局部动态屈服应力随动攀升的过程；
-- **图 3**：对比工作峰值应力与真实断裂破坏极限，清晰展示结构有效安全系数（Safety Factor）从静态的 **2.78x（绿色安全）** 断崖式暴跌至冲击下的 **1.11x（红色高危濒断区）**。
 
 ---
 
@@ -134,28 +127,10 @@ Case 3 仿真中严格计入了整车在紧急制动下的基座加速度（$a_x
 
 ### 一键执行全套实验
 ```bash
-# 执行三个算例并自动生成 3 张出版级分析图表
+# 执行三个算例并自动生成所有出版级分析图表与 3D VTK 实体模型
 python run_all.py
 ```
-
----
-
-## 📂 项目结构规范
-
-```
-├── README.md                                  # 核心研究白皮书（本文档）
-├── run_all.py                                 # 一键执行驱动脚本 (耗时约 7 秒)
-├── geometry/cantilever_beam.geo               # Gmsh 几何定义规范 (300x40x10 mm)
-├── mesh/generate_mesh.py                      # 结构化 Hex8 六面体网格构建器 (60x8x2)
-├── simulations/
-│   ├── common.py                              # 弹性动力学方程、Newmark 积分及 Cowper-Symonds 本构
-│   ├── static/static_load.py                  # Case 1: 准静态台架测试算例 (1500 N)
-│   ├── transient/dynamic_load.py              # Case 2: 动态平缓急刹算例 (50 ms Ramp)
-│   ├── acceleration/base_acceleration.py      # Case 3: 高应变率冲击跺脚与车身减速耦合算例
-│   └── postprocess.py                         # 提取时程数据并渲染 3 幅出版级高清图表
-├── results/                                   # 存放生成的图表 (png) 与仿真时程数据 (json)
-└── docs/methodology.md                        # 完整的连续介质力学、Cowper-Symonds 及微观断裂推导
-```
+生成的 3D 模型文件 `results/beam_case1_static.pvd` 和 `results/beam_case3_impact.pvd` 可直接使用 **ParaView** 打开进行交互式三维旋转查看！
 
 ---
 
