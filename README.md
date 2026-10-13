@@ -1,6 +1,6 @@
-# 汽车制动踏板及支架结构动态可靠性有限元验证 Benchmark
-> **Dynamic Structural Reliability Benchmark for Automotive Brake Components: Why Dynamic Impact ≠ Static Qualification**  
-> 基于 Python / DOLFINx 0.11 / PETSc 的三维实体瞬态弹性动力学有限元分析平台
+# Dynamic Structural Reliability Benchmark for Automotive Brake Components
+
+A minimal 3D finite element benchmark demonstrating why dynamic loading impact rates fundamentally alter material constitutive behavior (Cowper-Symonds strain-rate hardening & dynamic embrittlement), exposing why quasi-static strength qualification fails to ensure dynamic reliability.
 
 ---
 
@@ -15,15 +15,15 @@
 
 ---
 
-## 🛠️ 一、 实验系统设置与力学边界条件 (Mermaid 流程图)
+## 🛠️ 一、 实验模型设计与力学边界条件 (Mermaid 流程图)
 
 ```mermaid
 flowchart LR
     subgraph Support["【固定安装端】X = 0"]
-        Fixed["车身前围防火墙<br>踏板总成安装托架<br><b>全固支边界条件</b><br>ux = uy = uz = 0"]
+        Fixed["车身前围防火墙 / 踏板支架托架<br><b>全固支边界条件</b><br>ux = uy = uz = 0"]
     end
 
-    subgraph Beam["【受力构件：钢制悬臂梁】长300 × 高40 × 厚10 mm"]
+    subgraph Beam["【受力构件：钢制悬臂梁】长300 × 高40 × 厚10 mm (二维平面应力)"]
         direction TB
         TopZone["⚠️ <b>上表面根部拉伸危险区</b> (Y = 40 mm)<br>承受全场最大弯曲拉应力！<br>动态冲击下最容易诱发解理脆性断裂"]
         Neutral["<b>截面中性轴</b> (Y = 20 mm)<br>弯曲正应力 σ_xx = 0 (无拉压变形)"]
@@ -46,7 +46,7 @@ flowchart LR
 
 ---
 
-## ⚡ 二、 三大对比实验加载条件对比 (Mermaid 加载时程图)
+## ⚡ 二、 三大对比实验加载条件 (Mermaid 加载时程图)
 
 ```mermaid
 flowchart TD
@@ -71,7 +71,7 @@ flowchart TD
 
 ---
 
-## 🚗 三、 整车力流闭环 vs 踏板受力第一性原理解耦 (Mermaid 辟谣拓扑)
+## 🚗 三、 整车力流闭环 vs 踏板受力第一性原理解耦 (Mermaid 拓扑)
 
 ```mermaid
 flowchart LR
@@ -100,103 +100,56 @@ flowchart LR
     GroundChassis -.-> Barrier -.-> PedalCabin
 ```
 
-> **力学第一性原理结论**：  
-> 地面制动摩擦力完全闭环在底盘系统内部。踏板自身作为质量不足 1 kg 的小构件，在急刹时承受的整车惯性力仅为 **$9.24\,\text{N}$（$0.61\%$）**。**“3 吨车比 2 吨车更重导致踏板受力成比例激增”属于彻底的力学伪科学**。
+---
+
+## 📊 四、 理论解析解 vs 有限元数值解 严格对齐
+
+| 物理量名称 | 理论解析解 (Analytical Closed-form) | FEM 数值解 (Numerical Solution) | 相对误差 |
+| :--- | :---: | :---: | :---: |
+| **一阶自振频率 $f_1$** | **$371.3\,\text{Hz}$** | **$371.3\,\text{Hz}$** | $0.00\%$ |
+| **自振基频周期 $T_1$** | **$2.69\,\text{ms}$** | **$2.69\,\text{ms}$** | $0.00\%$ |
+| **静态端部挠度 $w_{max}$** | **$1.205\,\text{mm}$** ($w = \frac{FL^3}{3EI}$) | **$1.204\,\text{mm}$** | $< 0.1\%$ |
+| **根部最大正应力 $\sigma_{max}$** | **$168.75\,\text{MPa}$** ($\sigma = \frac{6FL}{BH^2}$) | **$168.75\,\text{MPa}$** (外推节点值) | $< 0.1\%$ |
+| **阶跃冲击放大系数 $DAF$** | **$2.000$** (无阻尼理论极限) | **$1.840$** (含 3% 阻尼数值解) | 物理自洽 |
 
 ---
 
-## 💥 四、 为什么动态下极易被踩坏？微观物理机制对比 (Mermaid 决策树)
+## 📈 五、 三大工况系统性对比与图表成果展示 (`results/`)
 
-```mermaid
-flowchart TD
-    StaticTest["<b>慢速台架测试 (准静态 20 mm/min)</b>"]
-    StaticTest --> S1["变形时间充裕 (长达数秒)"]
-    S1 --> S2["金属内部晶格位错有充分时间滑移扩展"]
-    S2 --> S3["折弯圆角处的应力集中被塑性流动抹平钝化"]
-    S3 --> S4["全截面塑性吸能，硬化至抗拉极限 400 MPa 才断裂"]
-    S4 --> S5["<b>有效破坏安全系数高达 2.78 倍【极度安全】</b><br>(加严检验拉到 3000 N 也绝不会断裂)"]
-
-    DynamicImpact["<b>紧急避险急踩 (高应变率猛踩跺脚)</b>"]
-    DynamicImpact --> D1["变形时间极短 (仅 5~10 毫秒)"]
-    D1 --> D2["位错运动被晶格声子黏性阻尼死死锁住，无法滑移"]
-    D2 --> D3["丧失塑性流动，无法抹平应力尖峰 (缺口敏感度极高)"]
-    D3 --> D4["材料变脆像玻璃，直接撞上微观解理脆断极限 245 MPa"]
-    D4 --> D5["<b>有效破坏安全系数暴跌至 1.11 倍【濒临脆断高危！】</b><br>(受力暴涨而抗力暴跌，极易一脚踩断)"]
-```
+### 图 1：二维力学模型与三大加载工况时程波形
+![Figure 1: Model & Loading](results/fig1_model_and_loading.png)
+*(a) 纯净二维平面应力悬臂梁力学简图与解析解标定；(b) 三大工况载荷时间历程 $F(t)$ 输入。*
 
 ---
 
-## 📊 五、 仿真数值结果汇总与通俗说明
+### 图 2：三大工况系统性全景对比图 (时程响应、破坏极限与安全系数断崖)
+![Figure 2: Three Cases Comparison](results/fig2_three_cases_comparison.png)
+*(a) 自由端挠度时程对比 $u(t)$；(b) 最大等效应力时程对比 $\sigma_{vM}(t)$；(c) 实际工作应力 vs 真实破坏极限对比柱状图；(d) 破坏安全系数 $SF$ 断崖式缩水对比柱状图。*
 
 ```text
-==========================================================================================
-        RATE-DEPENDENT CONSTITUTIVE & STRUCTURAL FAILURE VALIDATION SUMMARY TABLE        
-==========================================================================================
-Case                 | Strain Rate   | Work Stress | Failure Limit | Safety Factor | Regime
-------------------------------------------------------------------------------------------
-Case 1: Static       |   1.0e-04 s^-1 |  143.63 MPa |    400.00 MPa |        2.78 x | Fully Ductile (极安全)
-Case 2: Dynamic      |   2.2e-02 s^-1 |  144.66 MPa |    320.00 MPa |        2.21 x | Moderate Margin (警戒)
-Case 3: Impact       |   1.6e-01 s^-1 |  220.84 MPa |    245.00 MPa |        1.11 x | Critical Embrittled (高危濒断!)
-==========================================================================================
+======================================================================
+工况编号             | 等效应变率         | 工作应力       | 破坏极限       | 安全系数
+----------------------------------------------------------------------
+Case 1: 准静态      |   1.0e-04 s^-1 |   143.6 MPa |   400.0 MPa |   2.78 x
+Case 2: 动态急踩     |   2.2e-02 s^-1 |   144.7 MPa |   320.0 MPa |   2.21 x
+Case 3: 高率冲击     |   1.6e-01 s^-1 |   220.8 MPa |   245.0 MPa |   1.11 x
+======================================================================
 ```
 
-### 通俗大白话解读：
-1. **Case 1 慢踩测试**：构件实际受力 143.6 MPa，而材料依靠优良的延性变形吸能，相当于拥有 **400 MPa 的厚盾牌**，安全系数高达 **2.78 倍（绿灯极度安全）**！
-2. **Case 2 平缓急踩**：踩踏速度较快，受力 144.7 MPa，盾牌厚度轻微萎缩至 320 MPa，安全系数为 **2.21 倍**；
-3. **Case 3 猛踩跺脚冲击**：脚掌初速度碰撞产生冲击冲量，**实际受力飙升至 220.8 MPa**；同时材料因剧烈变形变脆，**盾牌厚度断崖式萎缩至 245 MPa**。受力几乎贴着破坏极限，**安全系数跌落至 1.11 倍（红灯高危濒临踩断！）**。
+---
+
+### 图 3：二维空间应力场分布与破坏危险度云图
+![Figure 3: Spatial Stress Contours](results/fig3_spatial_stress_contours.png)
+*(a) Case 1 静态应力场 $\sigma_{vM}$ (峰值 143.6 MPa)；(b) Case 3 动态冲击应力场 $\sigma_{vM}$ (峰值 220.8 MPa)；(c) Case 1 破坏危险度 $\eta \le 0.36$ (充分安全)；(d) Case 3 破坏危险度 $\eta = 0.90$ (根部受拉区濒临脆断极限 1.0)。*
 
 ---
 
-## 📈 六、 出版级通俗高清图表展示 (`results/`)
+## 🚀 六、 一键运行与复现
 
-### 图 1：实验模型、几何尺寸与力学边界条件示意图
-![Experimental Setup & Boundary Conditions](results/experimental_setup_schematic.png)
-*直观展示三维悬臂梁踏板臂几何、全固支安装面、脚踩受力处、车身急刹自重微小惯性力（9.2N）、中性轴以及根部受拉脆断危险区。*
-
-### 图 2：悬臂梁空间应力场与破坏危险度分布云图
-![Spatial Stress & Failure Risk Contour](results/stress_distribution_contour.png)
-*直观对比：(a) 慢踩受力平缓安全；(b) 猛踩冲击根部受力暴涨 54% 并向前蔓延；(c) 慢踩破坏危险度仅 36%（全梁深绿）；(d) 猛踩冲击破坏危险度飙升至 90%（根部一片深红高危警报！）。*
-
-### 图 3：材料本构改变与动态脆化曲线
-![Constitutive](results/strain_rate_constitutive.png)
-*(a) 为什么越猛踩材料越硬（率强化效应）；(b) 踩踏速度过快导致材料延展吸能能力（韧性）断崖式跌落。*
-
-### 图 4：瞬态应变率时程与流变应力演化
-![Evolution](results/transient_rate_evolution.png)
-*(a) 瞬态变形速度（应变率）在猛踩下的爆发过程；(b) 内部动态流变应力随时间响应演变。*
-
-### 图 5：实际受力 vs 真实破坏极限（盾牌厚度）与破坏安全系数断崖
-![Stress Comparison](results/stress_comparison.png)
-*一目了然展示：慢踩时安全系数 2.78 倍（极安全）；猛踩冲击时安全系数缩水至 1.11 倍（高危濒临断裂）。*
-
----
-
-## 💡 七、 对现代车规级研发与测试的工程建议
-
-1. **破除“静态 3000N 认证等于动态安全”的误区**：
-   静态加严试验能够有效检验材料的纯静态延性变形能力与铰链焊缝的静态剪切强度，但它测试的是材料的“延性吸能区”（比拼抗拉极限 400 MPa）；而动态急刹面对的是“冲击高应变率脆化区”（受制于解理断裂极限 245 MPa）。两者考察的物理极限完全不同。
-2. **增设动态高应变率落锤 / 瞬态气缸冲击试验**：
-   建议在传统台架测试之外，增加上升沿 $T_{rise} \le 10\,\text{ms}$、初瞬冲击力 $2000 \sim 2500\,\text{N}$ 的冲击跺脚试验，直接考核高应变率下的抗脆断韧性。
-3. **强弱轴抗弯匹配与冲压折弯微裂纹控制**：
-   踏板臂截面的主抗弯惯性强轴（高度方向）必须严格对齐主踩踏力矢量；在模具工艺上严格控制折弯内侧 R 角的冲压微折痕，防止在微缺陷处因高应变率诱发低应力脆断。
-
----
-
-## 🚀 八、 一键复现与运行
-
-工程代码总行数严格控制在 **851 行**，无多余软件框架包袱。
-
-### 运行环境
-- Linux (Ubuntu 22.04/24.04 LTS) 或 macOS
-- Python 3.10+ / 3.12+
-- 核心依赖：`dolfinx >= 0.10.0`, `petsc4py`, `numpy`, `matplotlib`
-
-### 一键执行全套实验
 ```bash
-# 一键运行全部算例、渲染全部 5 张通俗易懂高清图表，并导出 ParaView 3D 模型
+# 运行全部算例、渲染全部 3 张高清图表并导出 ParaView 3D 模型
 python run_all.py
 ```
-生成的 3D 模型文件 `results/beam_case1_static.pvd` 和 `results/beam_case3_impact.pvd` 可直接使用 **ParaView** 打开进行交互式三维旋转查看！
 
 ---
 
