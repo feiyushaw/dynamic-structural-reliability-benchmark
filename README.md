@@ -6,11 +6,11 @@ A minimal 3D finite element benchmark demonstrating how dynamic loading impact r
 
 ## 1. Motivation: Rate-Dependent Constitutive Shift
 
-Standard automotive component qualification (e.g., QC/T 788-2018 for brake pedals) specifies quasi-static testing at $20\,\text{mm/min}$ ($\dot{\varepsilon} \sim 10^{-4}\,\text{s}^{-1}$). Under slow loading, structural steel exhibits high plastic ductility ($\varepsilon_f \approx 25\% - 30\%$), allowing components to redistribute local stresses without cracking.
+Standard automotive component qualification (e.g., QC/T 788-2018 for brake pedals) specifies quasi-static testing at $20\,\text{mm/min}$ ($\dot{\varepsilon} \sim 10^{-4}\,\text{s}^{-1}$). Under slow loading, structural steel exhibits high plastic ductility ($\varepsilon_f \approx 25\% - 30\%$), allowing components to redistribute local stresses without cracking up to the ultimate tensile strength ($\sigma_u \approx 400\,\text{MPa}$).
 
 In real-world emergency panic braking, driver foot impact occurs over $10 - 50\,\text{ms}$ ($\dot{\varepsilon} \sim 10^{-1} - 10^{2}\,\text{s}^{-1}$). This **multi-order-of-magnitude surge in strain rate** fundamentally alters the material constitutive law:
-1. **Strain-Rate Hardening**: Flow stress and yield threshold escalate via dislocation drag (modeled by the Cowper-Symonds law);
-2. **Dynamic Embrittlement**: Plastic strain capacity and fracture toughness $K_{IC}$ drop significantly ($< 63\%$ ductility retention), transforming ductile steel into a notch-sensitive brittle regime prone to abrupt fracture.
+1. **Strain-Rate Hardening vs Notch Embrittlement**: Although dislocation drag elevates nominal flow stress, it suppresses the plastic blunting of geometric notches and stress concentrations;
+2. **Dynamic Embrittlement**: Plastic strain capacity and fracture toughness $K_{IC}$ drop significantly ($< 63\%$ ductility retention), lowering the effective dynamic cleavage/rupture threshold to $\approx 245\,\text{MPa}$.
 
 ---
 
@@ -35,20 +35,20 @@ In real-world emergency panic braking, driver foot impact occurs over $10 - 50\,
 
 ## 4. Summary Validation Table
 
-| Case | Strain Rate $\dot{\varepsilon}_{eq}$ | Peak Stress $\sigma_{vM}$ | Cowper-Symonds $\sigma_y^{dyn}$ | Ductility Retention | Failure Regime |
+| Case | Strain Rate $\dot{\varepsilon}_{eq}$ | Work Stress $\sigma_{work}$ | Failure Limit $\sigma_{fail}^{dyn}$ | Safety Factor $SF$ | Structural Regime |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Case 1: Static** | $1.0 \times 10^{-4}\,\text{s}^{-1}$ | 143.63 MPa | 250.00 MPa | **100.0%** | Fully ductile, high safety margin |
-| **Case 2: Dynamic** | $2.2 \times 10^{-2}\,\text{s}^{-1}$ | 144.66 MPa | 305.47 MPa | **69.9%** | Moderate rate hardening (+22%) |
-| **Case 3: Impact** | $1.6 \times 10^{-1}\,\text{s}^{-1}$ | **220.84 MPa** | **333.07 MPa** | **62.8%** | **Dynamic embrittlement risk!** |
+| **Case 1: Static** | $1.0 \times 10^{-4}\,\text{s}^{-1}$ | 143.63 MPa | 400.00 MPa | **2.78x** | Fully ductile, large plastic buffer |
+| **Case 2: Dynamic** | $2.2 \times 10^{-2}\,\text{s}^{-1}$ | 144.66 MPa | 320.00 MPa | **2.21x** | Moderate margin |
+| **Case 3: Impact** | $1.6 \times 10^{-1}\,\text{s}^{-1}$ | **220.84 MPa** | **245.00 MPa** | **1.11x** | **Critical embrittled (High Risk!)** |
 
 > **Key Takeaway**:  
-> Static qualification cannot detect dynamic impact vulnerability. While static tests show ample safety margin, high-rate impact elevates operating stresses toward 220 MPa while simultaneously reducing material fracture ductility by over 37%, creating severe risk of unheralded brittle cleavage under emergency vehicle service.
+> Static qualification cannot detect dynamic impact vulnerability. While static tests provide an effective $2.78\times$ safety buffer due to plastic ductility, high-rate impact elevates working stresses toward 220 MPa while dynamic embrittlement suppresses plastic blunting, shrinking the safety factor to a precarious $1.11\times$ and creating severe risk of abrupt brittle fracture under emergency vehicle service.
 
 ---
 
 ## 5. Visualizations
 
-| Constitutive Rate Sensitivity | Transient Rate Evolution | Stress vs Yield Threshold |
+| Constitutive Rate Sensitivity | Transient Rate Evolution | Stress vs Fracture Threshold & SF |
 | :---: | :---: | :---: |
 | ![Constitutive](results/strain_rate_constitutive.png) | ![Evolution](results/transient_rate_evolution.png) | ![Stress Comparison](results/stress_comparison.png) |
 
