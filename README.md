@@ -15,6 +15,13 @@ A minimal 3D finite element benchmark demonstrating why dynamic loading impact r
 
 ---
 
+## 🛠️ 实验系统设计与力学边界条件示意图 (Experimental Setup & BCs)
+
+![Experimental Setup & Boundary Conditions](results/experimental_setup_schematic.png)
+*图 1：(a) 悬臂构件三维物理力学模型、全固支安装面、踏板端部向下载荷 $F(t)$、车身非惯性系体积分力 $f_b$、中性轴与根部危险拉伸区示意图；(b) 三大对比工况的载荷时程曲线输入；(c) 车辆运动非惯性系基座急刹减速度环境 $a_x(t)$。*
+
+---
+
 ## ⚖️ 静态实验 vs 动态实验：五大根本力学维度本质差异
 
 | 力学维度 | Case 1：准静态台架测试 (QC/T 788) | Case 2 & 3：动态紧急避险急刹 / 碰撞跺脚 | 物理本质与深层机理差异 |
@@ -27,9 +34,7 @@ A minimal 3D finite element benchmark demonstrating why dynamic loading impact r
 
 ---
 
-## 🔬 实验系统设计 (Experimental Design)
-
-为了严格对比静态与动态工况的响应差异，构建了具备完全解析对照标准的代表性汽车悬臂构件模型：
+## 🔬 实验参数与率相关本构规范
 
 ### 1. 构件几何与物理参数
 - **结构几何**：长度 $L = 300\,\text{mm}$，高度（强轴抗弯）$H = 40\,\text{mm}$，厚度 $B = 10\,\text{mm}$（与制动踏板臂力臂及主要弯曲截面高度一致）；
@@ -90,16 +95,22 @@ Case 3: Impact       |   1.6e-01 s^-1 |  220.84 MPa |    245.00 MPa |        1.1
 在 Case 3 中，由于冲量脉冲与动力驻波叠加，实际工作应力飙升至 **$220.84\,\text{MPa}$**；  
 实际工作应力（220.84 MPa）直接逼近脆断极限（245.00 MPa），**有效破坏安全系数从静态的 2.78x 暴跌至仅剩 1.11x**！若构件存在微小冲压折弯微裂纹，极易在急刹冲击下瞬间越过格里菲斯临界尺寸而失稳脆断。
 
+#### 4. 第一性原理粉碎舆论力学误区：车重增加不会加剧踏板受载
+Case 3 仿真中严格计入了整车在紧急制动下的基座加速度（$a_x = -1.0g$）：
+- 地面制动摩擦力作用于轮胎接地印痕面，经轮端卡钳、悬架摆臂、副车架传递至白车身，在底盘系统内**完全闭环平衡整车动能，绝不倒灌至踏板**；
+- 乘用车制动减速度受限于轮胎路面附着系数（$a_{max} = \mu g \approx 1.0g$），**2 吨车与 3 吨车的极限急刹减速度在理论上完全相同，均为 1.0g**；
+- 踏板构件自身质量仅 $0.942\,\text{kg}$，车身减速产生的反向达朗贝尔惯性力仅为 $9.24\,\text{N}$（仅占脚踏力的 **$0.61\%$**，应力增量仅 $0.02\,\text{MPa}$）。**2 吨车与 3 吨车在踏板惯性受载上物理差异为 0 N**。
+
 ---
 
 ## 📈 空间应力分布云图与可视化成果 (`results/`)
 
 ### 1. 悬臂梁空间应力场与破坏风险度空间分布云图
 ![Spatial Stress & Failure Risk Contour](results/stress_distribution_contour.png)
-*图：(a) Case 1 准静态应力云图；(b) Case 3 动态冲击应力空间激增云图；(c) Case 1 静态破坏风险指数场 ($\eta \le 0.36$)；(d) Case 3 动态冲击破坏风险指数场 ($\eta$ 逼近 0.90，根部拉应力区呈现大面积深红高危警报！)*
+*图 2：(a) Case 1 准静态应力云图；(b) Case 3 动态冲击应力空间激增云图；(c) Case 1 静态破坏风险指数场 ($\eta \le 0.36$)；(d) Case 3 动态冲击破坏风险指数场 ($\eta$ 逼近 0.90，根部拉应力区呈现大面积深红高危警报！)*
 
 ### 2. 本构演变与综合柱状对比图表
-| 图 1：材料率相关流变本构与动态脆化曲线 | 图 2：瞬态应变率时程与动态屈服极限演化 | 图 3：工作应力 vs 破坏极限与安全系数断崖 |
+| 图 3：材料率相关流变本构与动态脆化曲线 | 图 4：瞬态应变率时程与动态屈服极限演化 | 图 5：工作应力 vs 破坏极限与安全系数断崖 |
 | :---: | :---: | :---: |
 | ![Constitutive](results/strain_rate_constitutive.png) | ![Evolution](results/transient_rate_evolution.png) | ![Stress Comparison](results/stress_comparison.png) |
 
